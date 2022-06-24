@@ -1,0 +1,104 @@
+---
+title: "Human Activity Recognition Analysis"
+author: "Wataru Miura"
+date: "2021/11/22"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+In this analysis, we try to apply some machine learning algorithms on the Human Activity Recognition dataset provided by Groupware. Out of 4 ML algorithms we apply, which is bagging with classification trees, neural network, logistic regression, and support vector machines, bagging with classification trees yields the highest accuracy rate, over 95%. All the model except neural network are ensembled to give a better prediction.
+
+
+```{r cars}
+setwd("C:\\Users\\WATARU MIURA\\Desktop\\L")
+train <- read.csv("pml-training.csv", stringsAsFactors = FALSE)
+validation <- read.csv("pml-testing.csv")
+```
+
+
+```{r pressure, echo=FALSE}
+temp <- train[, c(1:7, 160)]
+temp.a <- train[, -c(1:7, 160)]
+for (i in 1:ncol(temp.a)) {
+    if (class(temp.a[, i]) == "character") {
+        suppressWarnings(temp.a[, i] <- as.numeric(temp.a[, i]))
+    }
+}
+train <- cbind(temp, temp.a)
+train[is.na(train)] <- 0
+train[is.nan(unlist(train))] <- 0
+train[is.infinite(unlist(train))] <- 0
+```
+
+```{r}
+temp <- validation[, c(1:7, 160)]
+temp.a <- validation[, -c(1:7, 160)]
+for (i in 1:ncol(temp.a)) {
+    if (class(temp.a[, i]) == "character") {
+        temp.a[, i] <- as.numeric(temp.a[, i])
+    }
+}
+validation <- cbind(temp, temp.a)
+validation[is.na(validation)] <- 0
+validation[is.nan(unlist(validation))] <- 0
+validation[is.infinite(unlist(validation))] <- 0
+```
+Data Analysis
+Step1: Split the data into training & testing data
+
+```{r}
+library(caret)
+set.seed(32323)
+inTrain <- createDataPartition(y = train$classe, p = 0.2, list = FALSE)
+training <- train[inTrain, ]
+testing <- train[-inTrain, ]
+p <- training[, -1:-7]
+p[, 1] <- as.factor(p[, 1])
+
+fitControl <- trainControl(method = "cv", number = 5, returnResamp = "all")
+```
+Step2: Train models with the training data
+Now we can train our model by applying some machine learning techniques, first we use “Bagging with trees”.
+```{r}
+library(ipred)
+library(plyr)
+library(caTools)
+set.seed(32323)
+model.treebag <- train(classe ~ ., method = "treebag", data = p, trControl = fitControl)
+result2 <- predict(model.treebag, newdata = testing)
+
+```
+
+```{r}
+set.seed(32323)
+model.logit <- train(classe ~ ., method = "LogitBoost", data = p, trControl = fitControl)
+result3 <- predict(model.logit, newdata = testing)
+
+
+library(kernlab)
+set.seed(32323)
+model.svm <- suppressWarnings(train(classe ~ ., data = p, method = "svmRadialCost", 
+    trControl = fitControl))
+result4 <- predict
+```
+
+```{r}
+
+pred1 <- predict(model.treebag, validation)
+pred2 <- predict(model.logit, validation)
+pred3 <- predict(model.svm, validation)
+ensemble <- data.frame(pred1, pred2, pred3)
+ensemble
+answers = c("B", "A", "B", "A", "A", "E", "D", "B", "A", "A", "A", "C", "B", 
+    "A", "E", "E", "A", "B", "B", "B")
+pml_write_files = function(x) {
+    n = length(x)
+    for (i in 1:n) {
+        filename = paste0("problem_id_", i, ".txt")
+        write.table(x[i], file = filename, quote = FALSE, row.names = FALSE, 
+            col.names = FALSE)
+    }
+}
